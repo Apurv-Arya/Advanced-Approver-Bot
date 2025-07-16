@@ -55,7 +55,7 @@ async def login_handler(event):
     user_id = sender.id
 
     # Prevent starting a new login if one is already in progress
-    if user_id in user_login_locks and not user_login_locks[user_id].done():
+    if user_id in user_login_locks and not user_login_locks[user_id].is_set():
         await event.reply("A login process is already active. Please complete or cancel it first.")
         return
     
