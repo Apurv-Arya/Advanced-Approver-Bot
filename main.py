@@ -101,7 +101,7 @@ async def approve_handler(_, message: Message):
 
     try:
         async for dialog in user_client.get_dialogs():
-            if dialog.chat.type == enums.ChatType.CHANNEL or dialog.chat.type == enums.ChatType.GROUP:
+            if dialog.chat.type in [enums.ChatType.CHANNEL, enums.ChatType.GROUP, enums.ChatType.SUPERGROUP]:
                 try:
                     member = await user_client.get_chat_member(dialog.chat.id, "me")
                     if member.privileges and member.privileges.can_invite_users:
@@ -151,16 +151,17 @@ async def approve_callback(_, callback_query: CallbackQuery):
         
         async for request in user_client.get_chat_join_requests(chat_id):
             try:
-                await user_client.approve_chat_join_request(chat_id, request.from_user.id)
+                # Corrected: Use request.user.id instead of request.from_user.id
+                await user_client.approve_chat_join_request(chat_id, request.user.id)
                 approved_count += 1
                 await asyncio.sleep(1) # Delay to avoid flood waits
             except FloodWait as e:
                 await asyncio.sleep(e.value)
-                await user_client.approve_chat_join_request(chat_id, request.from_user.id)
+                await user_client.approve_chat_join_request(chat_id, request.user.id)
                 approved_count += 1
             except Exception as e:
                 failed_count += 1
-                logging.warning(f"Failed to approve user {request.from_user.id} in chat {chat_id}: {e}")
+                logging.warning(f"Failed to approve user {request.user.id} in chat {chat_id}: {e}")
 
         if approved_count == 0 and failed_count == 0:
             await callback_query.message.edit_text(f"✅ No pending join requests found for the selected chat.")
@@ -209,7 +210,8 @@ async def conversation_handler(client: Client, message: Message):
             await message.reply_text(f"An error occurred: {e}. Please start again with `/login`.")
             if "client" in conversation_state.get(user_id, {}):
                 await conversation_state[user_id]["client"].disconnect()
-            del conversation_state[user_id]
+            if user_id in conversation_state:
+                del conversation_state[user_id]
 
     elif isinstance(state, dict) and state.get("state") == "awaiting_code":
         code = message.text
