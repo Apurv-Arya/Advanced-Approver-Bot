@@ -6,26 +6,10 @@ from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
 from dotenv import load_dotenv
 
-# Handle varying import paths for different Telethon versions
-try:
-    from telethon.tl.functions.channels import GetChatjoinRequestsRequest
-except ImportError:
-    from telethon.tl.functions.messages import GetChatjoinRequestsRequest
-
-try:
-    from telethon.tl.functions.messages import HideChatJoinRequestRequest
-except ImportError:
-    from telethon.tl.functions.channels import HideChatJoinRequestRequest
-
-try:
-    # This type's location can vary, so we try multiple common paths.
-    from telethon.tl.types.messages import ChatjoinRequests
-except ImportError:
-    try:
-        from telethon.tl.types.channels import ChatjoinRequests
-    except ImportError:
-        # Fallback for older versions where it might be in the base types module
-        from telethon.tl.types import ChatjoinRequests
+# With a fixed Telethon version, we can use standard import paths.
+from telethon.tl.functions.channels import GetChatjoinRequestsRequest, HideChatJoinRequestRequest
+from telethon.tl.types import PeerChannel
+from telethon.tl.types.channels import ChatjoinRequests
 
 
 # --- Basic Configuration ---
@@ -234,16 +218,13 @@ async def approve_callback(event):
     await event.edit("⏳ **Processing...**\nFetching and approving requests. This may take a moment.")
 
     try:
-        target_chat = await client.get_entity(chat_id)
+        target_chat = await client.get_entity(PeerChannel(chat_id))
         approved_count = 0
         failed_count = 0
         
         # Use the raw API request for broader compatibility
         result = await client(GetChatjoinRequestsRequest(
-            peer=target_chat,
-            offset_date=None,
-            offset_user=await client.get_input_entity('me'), # A dummy value is often needed
-            limit=200 # Process up to 200 at a time
+            peer=target_chat
         ))
         
         # Create a mapping from user_id to the full user object for the approval function
