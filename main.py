@@ -4,10 +4,20 @@ import logging
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.functions.channels import GetChatjoinRequestsRequest
-from telethon.tl.functions.messages import HideChatJoinRequestRequest
 from telethon.tl.types import ChatjoinRequests
 from dotenv import load_dotenv
+
+# Handle varying import paths for different Telethon versions
+try:
+    from telethon.tl.functions.channels import GetChatjoinRequestsRequest
+except ImportError:
+    from telethon.tl.functions.messages import GetChatjoinRequestsRequest
+
+try:
+    from telethon.tl.functions.messages import HideChatJoinRequestRequest
+except ImportError:
+    from telethon.tl.functions.channels import HideChatJoinRequestRequest
+
 
 # --- Basic Configuration ---
 logging.basicConfig(format='[%(levelname) 5s/%(asctime)s] %(name)s: %(message)s', level=logging.INFO)
