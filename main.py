@@ -4,7 +4,8 @@ import logging
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.functions.messages import GetChatjoinRequestsRequest
+from telethon.tl.functions.channels import GetChatjoinRequestsRequest
+from telethon.tl.functions.messages import HideChatJoinRequestRequest
 from telethon.tl.types import ChatjoinRequests
 from dotenv import load_dotenv
 
@@ -226,17 +227,22 @@ async def approve_callback(event):
             limit=200 # Process up to 200 at a time
         ))
         
-        user_ids_to_approve = []
-        if isinstance(result, ChatjoinRequests) and hasattr(result, 'requests'):
-            user_ids_to_approve = [req.user_id for req in result.requests]
-
-        if not user_ids_to_approve:
+        # Create a mapping from user_id to the full user object for the approval function
+        users_map = {user.id: user for user in result.users}
+        
+        if not hasattr(result, 'requests') or not result.requests:
              await event.edit(f"✅ No pending join requests found for **{target_chat.title}**.")
              return
 
-        for user_id_to_approve in user_ids_to_approve:
+        for request in result.requests:
+            user_id_to_approve = request.user_id
             try:
-                await client.approve_chat_join_request(target_chat, user_id_to_approve)
+                # Use the more compatible raw API call to approve the request
+                await client(HideChatJoinRequestRequest(
+                    peer=target_chat,
+                    user_id=users_map[user_id_to_approve],
+                    approved=True
+                ))
                 approved_count += 1
                 await asyncio.sleep(1) # Add a small delay to avoid hitting API limits
             except Exception as e:
