@@ -6,10 +6,9 @@ from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
 from dotenv import load_dotenv
 
-# With a fixed Telethon version, we can use standard import paths.
-from telethon.tl.functions.channels import GetChatjoinRequestsRequest, HideChatJoinRequestRequest
-from telethon.tl.types import PeerChannel
-from telethon.tl.types.channels import ChatjoinRequests
+# Corrected import paths for modern Telethon versions.
+from telethon.tl.functions.messages import GetChatjoinRequestsRequest, HideChatJoinRequestRequest
+from telethon.tl.types.messages import ChatjoinRequests
 
 
 # --- Basic Configuration ---
@@ -218,7 +217,7 @@ async def approve_callback(event):
     await event.edit("⏳ **Processing...**\nFetching and approving requests. This may take a moment.")
 
     try:
-        target_chat = await client.get_entity(PeerChannel(chat_id))
+        target_chat = await client.get_entity(chat_id)
         approved_count = 0
         failed_count = 0
         
