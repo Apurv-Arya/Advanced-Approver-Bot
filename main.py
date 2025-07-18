@@ -4,6 +4,8 @@ import logging
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
+from telethon.tl.functions.messages import GetChatjoinRequestsRequest
+from telethon.tl.types import ChatjoinRequests
 from dotenv import load_dotenv
 
 # --- Basic Configuration ---
@@ -216,24 +218,36 @@ async def approve_callback(event):
         approved_count = 0
         failed_count = 0
         
-        # Use iter_chat_join_requests to get pending requests
-        async for request in client.iter_chat_join_requests(target_chat):
+        # Use the raw API request for broader compatibility
+        result = await client(GetChatjoinRequestsRequest(
+            peer=target_chat,
+            offset_date=None,
+            offset_user=await client.get_input_entity('me'), # A dummy value is often needed
+            limit=200 # Process up to 200 at a time
+        ))
+        
+        user_ids_to_approve = []
+        if isinstance(result, ChatjoinRequests) and hasattr(result, 'requests'):
+            user_ids_to_approve = [req.user_id for req in result.requests]
+
+        if not user_ids_to_approve:
+             await event.edit(f"✅ No pending join requests found for **{target_chat.title}**.")
+             return
+
+        for user_id_to_approve in user_ids_to_approve:
             try:
-                await client.approve_chat_join_request(target_chat, request.user_id)
+                await client.approve_chat_join_request(target_chat, user_id_to_approve)
                 approved_count += 1
                 await asyncio.sleep(1) # Add a small delay to avoid hitting API limits
             except Exception as e:
                 failed_count += 1
-                logging.warning(f"Failed to approve user {request.user_id} in chat {chat_id}: {e}")
+                logging.warning(f"Failed to approve user {user_id_to_approve} in chat {chat_id}: {e}")
 
-        if approved_count == 0 and failed_count == 0:
-            await event.edit(f"✅ No pending join requests found for **{target_chat.title}**.")
-        else:
-            await event.edit(
-                f"**Approval Complete for {target_chat.title}!**\n\n"
-                f"✅ Approved: **{approved_count}** new members.\n"
-                f"❌ Failed: **{failed_count}** members."
-            )
+        await event.edit(
+            f"**Approval Complete for {target_chat.title}!**\n\n"
+            f"✅ Approved: **{approved_count}** new members.\n"
+            f"❌ Failed: **{failed_count}** members."
+        )
         logging.info(f"User {user_id} approved {approved_count} requests for chat {chat_id}.")
 
     except Exception as e:
