@@ -62,23 +62,37 @@ async def login_handler(event):
     login_lock = asyncio.Event()
     user_login_locks[user_id] = login_lock
 
-    # Check if user is already logged in
+    # Check if user is already logged in and connected in memory
     if user_id in user_clients:
+        client = user_clients[user_id]
         try:
-            client = user_clients[user_id]
-            if await client.is_user_authorized():
+            if client.is_connected() and await client.is_user_authorized():
                 await event.reply("✅ You are already logged in.")
                 login_lock.set()
                 return
         except Exception as e:
-            logging.warning(f"Error checking auth for user {user_id}: {e}. Proceeding with login.")
+            logging.warning(f"Re-login required for user {user_id}: {e}")
             del user_clients[user_id]
 
 
     session_file = f'{user_id}.session'
     client = TelegramClient(session_file, int(API_ID), API_HASH)
+    is_connected = False
 
     try:
+        await client.connect()
+        is_connected = True
+
+        # If session is valid, no need to ask for credentials
+        if await client.is_user_authorized():
+            user_clients[user_id] = client
+            me = await client.get_me()
+            await event.reply(f"✅ Welcome back, {me.first_name}! You are already logged in.")
+            logging.info(f"User {user_id} ({me.first_name}) reconnected via session file.")
+            login_lock.set()
+            return
+
+        # If not authorized, start the full login flow
         await event.reply("🚀 **Starting Login Process...**\nPlease follow the instructions carefully.")
         
         async with bot.conversation(sender, timeout=300) as conv:
@@ -130,6 +144,10 @@ async def login_handler(event):
         await event.reply(f"An unexpected error occurred: {e}")
         logging.error(f"Login error for user {user_id}: {e}")
     finally:
+        # If login failed but client is connected, disconnect it.
+        # If successful, leave it connected and stored in user_clients.
+        if user_id not in user_clients and is_connected:
+            await client.disconnect()
         login_lock.set() # Release the lock
 
 @bot.on(events.NewMessage(pattern='/approve'))
@@ -138,11 +156,23 @@ async def approve_handler(event):
     sender = await event.get_sender()
     user_id = sender.id
 
-    if user_id not in user_clients or not await user_clients[user_id].is_user_authorized():
-        await event.reply("You need to `/login` first.")
+    if user_id not in user_clients:
+        await event.reply("You need to `/login` first. If you have logged in before, try again as your session might have expired.")
+        return
+    
+    client = user_clients[user_id]
+    
+    try:
+        if not client.is_connected():
+            await client.connect()
+        if not await client.is_user_authorized():
+            await event.reply("Your session has expired. Please `/login` again.")
+            return
+    except Exception as e:
+        await event.reply(f"Could not verify your session. Please `/login` again. Error: {e}")
         return
 
-    client = user_clients[user_id]
+
     buttons = []
     
     await event.reply("⏳ Fetching your chats, please wait...")
