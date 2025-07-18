@@ -4,7 +4,6 @@ import logging
 from telethon import TelegramClient, events, Button
 from telethon.sessions import StringSession
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.types import ChatjoinRequests
 from dotenv import load_dotenv
 
 # Handle varying import paths for different Telethon versions
@@ -17,6 +16,16 @@ try:
     from telethon.tl.functions.messages import HideChatJoinRequestRequest
 except ImportError:
     from telethon.tl.functions.channels import HideChatJoinRequestRequest
+
+try:
+    # This type's location can vary, so we try multiple common paths.
+    from telethon.tl.types.messages import ChatjoinRequests
+except ImportError:
+    try:
+        from telethon.tl.types.channels import ChatjoinRequests
+    except ImportError:
+        # Fallback for older versions where it might be in the base types module
+        from telethon.tl.types import ChatjoinRequests
 
 
 # --- Basic Configuration ---
